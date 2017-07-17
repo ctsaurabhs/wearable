@@ -1,13 +1,19 @@
 package ctsaurabhs.imu;
 
+import android.content.Context;
+import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
 
-
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.util.Random;
 import java.util.UUID;
 //import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
@@ -16,6 +22,7 @@ import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
 //import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -23,21 +30,17 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
-import com.jjoe64.graphview.DefaultLabelFormatter;
 import com.jjoe64.graphview.GraphView;
-import com.jjoe64.graphview.ValueDependentColor;
-import com.jjoe64.graphview.helper.StaticLabelsFormatter;
-import com.jjoe64.graphview.series.BarGraphSeries;
+import com.jjoe64.graphview.Viewport;
 import com.jjoe64.graphview.series.DataPoint;
-import com.jjoe64.graphview.series.DataPointInterface;
 import com.jjoe64.graphview.series.LineGraphSeries;
-import com.jjoe64.graphview.series.PointsGraphSeries;
 
+import static android.R.attr.data;
 
 public class MainActivity extends AppCompatActivity {
 
     Button btnOn, btnOff;
-    TextView txtArduino, txtString, txtStringLength, sensorView0, sensorView1, sensorView2, sensorView3;
+    TextView txtArduino, txtString, txtStringLength, sensorView0, sensorView1;
     Handler bluetoothIn;
 
 
@@ -55,6 +58,22 @@ public class MainActivity extends AppCompatActivity {
     // String for MAC address
     private static String address;
 
+    private static final Random RANDOM = new Random();
+    private LineGraphSeries<DataPoint> series;
+    private float lastX = 0;
+
+    /* Checks if external storage is available for read and write */
+    public boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state)) {
+            return true;
+        }
+        return false;
+    }
+
+
+    private static Context context;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -62,15 +81,28 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         // get handles to Views defined in our layout file
 
+        final File file = new File(getExternalFilesDir(null), "imuDATA.txt");
+        final String parentPath = file.getParent() + File.separator + "imuDATA.txt";
+
         GraphView graph = (GraphView) findViewById(R.id.graph);
-        LineGraphSeries<DataPoint> series = new LineGraphSeries<DataPoint>(new DataPoint[] {
-                new DataPoint(0, 1),
-                new DataPoint(1, 5),
-                new DataPoint(2, 3),
-                new DataPoint(3, 2),
-                new DataPoint(4, 6)
-        });
+
+        series = new LineGraphSeries<DataPoint>();
         graph.addSeries(series);
+        // customize a little bit viewport
+        Viewport viewport = graph.getViewport();
+        viewport.setYAxisBoundsManual(true);
+        viewport.setMinY(0);
+        viewport.setMaxY(500);
+        viewport.setScrollable(true);
+
+        context = getApplicationContext();
+        if(isExternalStorageWritable())
+        {
+            Toast.makeText(getBaseContext(), "YES EXTERN", Toast.LENGTH_LONG).show();
+        }
+        else {
+            Toast.makeText(getBaseContext(), "No EXTERN", Toast.LENGTH_SHORT).show();
+        }
 
 
         //Link the buttons and textViews to respective views
@@ -80,8 +112,6 @@ public class MainActivity extends AppCompatActivity {
         txtStringLength = (TextView) findViewById(R.id.testView1);
         sensorView0 = (TextView) findViewById(R.id.sensorView0);
         sensorView1 = (TextView) findViewById(R.id.sensorView1);
-        sensorView2 = (TextView) findViewById(R.id.sensorView2);
-        sensorView3 = (TextView) findViewById(R.id.sensorView3);
 
         bluetoothIn = new Handler() {
             public void handleMessage(android.os.Message msg) {
@@ -95,24 +125,70 @@ public class MainActivity extends AppCompatActivity {
                         int dataLength = dataInPrint.length();							//get length of data received
                         txtStringLength.setText("String Length = " + String.valueOf(dataLength));
 
+                        try {
+                            // Very simple code to copy a picture from the application's
+                            // resource into the external file.  Note that this code does
+                            // no error checking, and assumes the picture is small (does not
+                            // try to copy it in chunks).  Note that if external storage is
+                            // not currently mounted this will silently fail.
+
+                            FileOutputStream os = new FileOutputStream(parentPath,true);
+                            os.write(dataInPrint.getBytes());
+                            os.close();
+                        } catch (IOException e) {
+                            // Unable to create file, likely because external storage is
+                            // not currently mounted.
+                            Log.w("ExternalStorage", "Error writing ", e);
+                        }
+
+
                         if (recDataString.charAt(0) == '#')								//if it starts with # we know it is what we are looking for
                         {
-                            String sensor0 = recDataString.substring(1, 5);             //get sensor value from string between indices 1-5
-                            String sensor1 = recDataString.substring(6, 10);            //same again...
-                            String sensor2 = recDataString.substring(11, 15);
-                            String sensor3 = recDataString.substring(16, 20);
+                            String pitch_0 = null;
+                            String pitch_1 = null;
 
-                            sensorView0.setText(" Sensor 0 Voltage = " + sensor0 + "V");	//update the textviews with sensor values
-                            sensorView1.setText(" Sensor 1 Voltage = " + sensor1 + "V");
-                            sensorView2.setText(" Sensor 2 Voltage = " + sensor2 + "V");
-                            sensorView3.setText(" Sensor 3 Voltage = " + sensor3 + "V");
+                            String mpuNO = recDataString.substring(7,7);
+                            Toast.makeText(getBaseContext(), mpuNO, Toast.LENGTH_SHORT).show();
+                            pitch_0 = recDataString.substring(12,endOfLineIndex);
+                            Toast.makeText(getBaseContext(), pitch_0, Toast.LENGTH_SHORT).show();
 
-                            if (sensor0 != null){
-                                //mValueTV.setText(data);
+//                            if(0 == Integer.parseInt(mpuNO))
+  //                          {
+    //                            pitch_0 = recDataString.substring(11,endOfLineIndex);
+  //                          } else if(1 == Integer.parseInt(mpuNO))
+                            {
+      //                          pitch_1 = recDataString.substring(11,endOfLineIndex);
+                            }
+
+
+                            sensorView0.setText(" Pitch 0  = " + pitch_0 + " ");	//update the textviews with sensor values
+                            sensorView1.setText(" Pitch 1  = " + pitch_1 + " ");
+
+                            if (pitch_0 != null){
                                 try {
-                                    // since we know that our string value is an int number we can parse it to an integer
-                                    final int sensorReading = Integer.parseInt(sensor0);
-                              
+                                    // since we know that our string value is an float number we can parse it to a float
+                                    final float sensorReading = Float.parseFloat(pitch_0);
+                                    series.appendData(new DataPoint(lastX, sensorReading), false, 500);
+                                    lastX += 0.2;
+                                   // writeToFile(sensor0, context);
+/*
+                                    try {
+                                        // Very simple code to copy a picture from the application's
+                                        // resource into the external file.  Note that this code does
+                                        // no error checking, and assumes the picture is small (does not
+                                        // try to copy it in chunks).  Note that if external storage is
+                                        // not currently mounted this will silently fail.
+
+                                        FileOutputStream os = new FileOutputStream(parentPath,true);
+                                        os.write(pitch_0.getBytes());
+                                        os.close();
+                                    } catch (IOException e) {
+                                        // Unable to create file, likely because external storage is
+                                        // not currently mounted.
+                                        Log.w("ExternalStorage", "Error writing ", e);
+                                    }
+*/
+                                    //  series.appendData(new DataPoint(lastX++, RANDOM.nextDouble() * 10d), true, 10);
                                 }
                                 catch (NumberFormatException e) { /* oh data was not an integer */ }
                             }
@@ -252,6 +328,7 @@ public class MainActivity extends AppCompatActivity {
                     bluetoothIn.obtainMessage(handlerState, bytes, -1, readMessage).sendToTarget();
                    // Toast.makeText(getBaseContext(), readMessage, Toast.LENGTH_LONG).show();
                    // Toast.makeText(getBaseContext(), "read msg", Toast.LENGTH_SHORT).show();
+
                 } catch (IOException e) {
                     break;
                 }

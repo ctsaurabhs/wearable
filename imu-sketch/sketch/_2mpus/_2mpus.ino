@@ -252,7 +252,7 @@ void handleMPUevent(uint8_t mpu) {
     // read and dump a packet if the queue contains more than one
     while (currentMPU->_fifoCount >= 2 * currentMPU->_packetSize) {
       // read and dump one sample
-      Serial.print("DUMP"); // this trace will be removed soon
+      //Serial.print("DUMP"); // this trace will be removed soon
       currentMPU->getFIFOBytes(fifoBuffer);
     }
 
