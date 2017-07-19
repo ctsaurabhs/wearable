@@ -295,7 +295,7 @@ void handleMPUevent(uint8_t mpu) {
   //  OUTPUT_SERIAL.print("pr:"); OUTPUT_SERIAL.print(mpu); OUTPUT_SERIAL.print("\t");
     // # marks start of communication for App
     OUTPUT_SERIAL.print("#");
-    OUTPUT_SERIAL.print("pitch:"); OUTPUT_SERIAL.print(mpu); OUTPUT_SERIAL.print("\t");
+    OUTPUT_SERIAL.print("pitch:"); OUTPUT_SERIAL.print(mpu); OUTPUT_SERIAL.print("@");
 #if defined(OUTPUT_READABLE_YAWPITCHROLL)
     OUTPUT_SERIAL.print(ypr[0] * 180 / M_PI);
     OUTPUT_SERIAL.print("\t");
